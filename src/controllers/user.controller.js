@@ -223,7 +223,7 @@ const changeCurrentPassword = asyncHandler(async (req,res) => {
 
     const user = await User.findById(req.user?._id) // since due to auth middleware we consider user is already logged in
 
-    const isPasswordValid = await user.isPasswordCorrect(password)
+    const isPasswordValid = await user.isPasswordCorrect(oldPassword)
 
     if(!isPasswordValid)
     {
@@ -241,7 +241,7 @@ const changeCurrentPassword = asyncHandler(async (req,res) => {
 const getCurrentUser = asyncHandler(async (req,res)=> {
     return res
     .status(200)
-    .json(200 , req.user , "current user fetched succesfully")
+    .json(new ApiResponse(200, req.user , "current User Details"))
 })
 
 const updateAccountDetails = asyncHandler(async (req,res) => {
@@ -251,7 +251,7 @@ const updateAccountDetails = asyncHandler(async (req,res) => {
         throw new ApiError(400, "All fields are required")
     }
 
-    const user = User.findByIdAndUpdate(req.user?._id,
+    const user = await User.findByIdAndUpdate(req.user?._id,
         {
             $set : {
                 fullName,
@@ -294,6 +294,7 @@ const updateUserAvatar = asyncHandler( async(req,res)=> {
     .json(
         new ApiResponse(200, user , "Avatar update successfully")
     )
+    //task delte avatar url
 })
 
 const updateUserCoverImage = asyncHandler( async(req,res)=> {
