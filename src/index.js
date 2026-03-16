@@ -1,13 +1,14 @@
 /*require('dotenv').config({ path : './env'})*/
 import dotenv from "dotenv"
-
+import { app } from "./app.js"
 import DBConnect from "./db/index.js"
-
+import { v2 as cloudinary } from 'cloudinary';
 dotenv.config({
-    path : `./env`
+    path : `./.env`
 })
 
 
+    
 
 DBConnect()
 .then(() => {
