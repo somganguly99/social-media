@@ -14,3 +14,8 @@ const subscriptionSchema = new Schema ({
 })
 
 export const Subscription = mongoose.model("Subscription" , subscriptionSchema)
+
+
+// Every time a subscription is done , a page is created containing channel and subscriber 
+// To count and see number and who have subscribed to a channel , we count the number of pages containing the channel
+// To count and see number and to which channek subscriber has subscribed to , we count the number of pages containing the subscriber .

@@ -1,7 +1,7 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import {ApiError} from "../utils/ApiError.js"
 import {User} from "../models/user.model.js"
-import {uploadOnCloudinary} from "../utils/cloudinary.js"
+import {uploadOnCloudinary , deleteFromCloudinary} from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 
@@ -20,10 +20,6 @@ const generateAccessandRefreshTokens = async(userId) => {
         throw new ApiError(505 , "Something went wrong while generating user and access token")
     }
 }
-
-
-
-
 
 const registerUser = asyncHandler( async (req,res) => {
     //get user details from frontend `
@@ -298,7 +294,7 @@ const updateUserAvatar = asyncHandler( async(req,res)=> {
 })
 
 const updateUserCoverImage = asyncHandler( async(req,res)=> {
-    const coverImageLocalPath = req.file?.path
+    const coverImageLocalPath = await req.file?.path
 
     if(!coverImageLocalPath){
         throw new ApiError(400, "coverImage file is missing")
@@ -309,8 +305,15 @@ const updateUserCoverImage = asyncHandler( async(req,res)=> {
     if(!coverImage.url){
         throw new ApiError(400, "Error while uploading coverImage")
     }
+    
+    const user = await User.findById(req.user?._id).select("-password")
+    
+    if (user.coverImage) {
+    await deleteFromCloudinary(user.coverImage);
+}
 
-    const user = await User.findByIdAndUpdate(
+    console.log("previous image deleted successfully")
+    /*const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
             $set :{
@@ -318,8 +321,9 @@ const updateUserCoverImage = asyncHandler( async(req,res)=> {
             }
         },
         {new : true}
-    ).select("-password")
-
+    ).select("-password")*/
+    user.coverImage = coverImage.url
+    await user.save({validateBeforeSave : false})
     return res
     .status(200)
     .json(
@@ -327,5 +331,124 @@ const updateUserCoverImage = asyncHandler( async(req,res)=> {
     )
 })
 
+const getUserChannelProfile = asyncHandler(async(req,res)=> {
+    const {username} = req.params
 
-export {registerUser , loginUser , logoutUser , refreshAccessToken , changeCurrentPassword , getCurrentUser , updateAccountDetails, updateUserAvatar, updateUserCoverImage}
+    if(!username?.trim()){
+        throw new ApiError(400,"username is missing")
+    }
+
+    const channel = await User.aggregate([
+        {
+            $match : {
+                username : username?.toLowerCase()
+            }
+        },{
+            $lookup : {
+                from : "subscriptions",
+                localField : "_id",
+                foreignField : "channel",
+                as : "subscribers"
+            }
+        }/**see subscribers by comparing user id with  number of pages containing that id as channel*/
+        ,{
+            $lookup : {
+                from : "subscriptions", //model become lower case and plural
+                localField : "_id",
+                foreignField : "subscriber",
+                as : "channels"
+            }
+        }/**see channels by comparing user id with  number of pages containing that id as subscriber*/
+        ,{
+            $addFIelds : {
+                subscribersCount : {
+                    $size : "$subscribers" //$size counts number of entries corresponding to given one in db . we use $ to show its a field
+                },
+                subscribedToCount : {
+                    $size : "$channels"
+                },
+                isSubscribed : {
+                    $cond : {
+                        if: {$in : [req.user?._id, "$subscribers.subscriber"]}, //see if current user is present in subscribers db's subscriber field
+                        then : true,
+                        else : false //If subscribed tell frontend true , they will show subscribed as frontend , else show subscribe as button
+                    }
+                }
+            }
+        }, {
+            $project : {
+                fullName : 1,
+                username : 1,
+                subscribersCount : 1,
+                subscribedToCount : 1,
+                avatar : 1,
+                coverImage : 1,
+                isSubscribed :1,
+                email : 1
+            } //$project passes only the values projected as a result
+        }
+    ])//Aggregate pipeline is like join in MySQL
+
+    if(!channel?.length){
+        throw new ApiError(404,"Channel does not exist")
+    }
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, channel [0], "User channel fetched successfully")
+    ) 
+})
+
+const getWatchHistory = asyncHandler(async(req,res)=> {
+     //the id we get from userId lookup is a string , so when we use findById mongoose internally does the processing 
+     //mongoose doesnt work inside aggregate , we have to use directly
+     const user = await User.aggregate([
+        {
+          $match:{
+            _id : new mongoose.Types.ObjectId(req.user._id)
+          }  
+        }, {
+            $lookup : {
+                from :"videos",
+                localField : "watchHistory",
+                foreignField : "_id",
+                as : "watchHistory",
+                pipeline : [
+                    {
+                        $lookup : {
+                            from : "users",
+                            localField : "owner",
+                            foreignField : "_id",
+                            as : "owner",
+                            pipeline : [
+                                {
+                                    $project : {
+                                        fullName : 1,
+                                        username : 1,
+                                        avatar :1
+                                    }
+                                }
+                            ]
+                        }
+                    }, {
+                        $addFields : {
+                            owner : {
+                                $first : "$owner"
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+     ])
+
+     return res.status(200)
+     .json(
+        new ApiRespinse(200, user[0].watchHistory,"Watch History fetched successfully")
+     )
+})
+
+
+
+export {registerUser , loginUser , logoutUser , refreshAccessToken , changeCurrentPassword , getCurrentUser , updateAccountDetails, updateUserAvatar, updateUserCoverImage, getUserChannelProfile, getWatchHistory}
