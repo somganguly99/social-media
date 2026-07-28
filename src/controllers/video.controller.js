@@ -136,10 +136,50 @@ const updateVideo = asyncHandler(async (req, res) => {
 const deleteVideo = asyncHandler(async (req, res) => {
     const { videoId } = req.params
     //TODO: delete video
+    const video = await Video.findById(videoId)
+    if(!video)
+    {
+        throw new ApiError(404,"Video Not Found")
+    }
+
+   if(video.thumbnail)
+   {
+        await deleteFromCloudinary(video.thumbnail)
+   }
+
+   await deleteFromCloudinary(video.videoFile)
+   await Video.deleteOne({ _id: videoId });
+   
+   return res
+            .status(200)
+            .json(new ApiResponse(200,  "Video Deleted Successfully"))
 })
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
     const { videoId } = req.params
+
+    const video = await Video.findByIdAndUpdate(
+    videoId,
+    [
+        {
+            $set: {
+                isPublished: { $not: "$isPublished" }
+            }
+        }
+    ],
+    { new: true }
+    ).select("-duration -views -updatedAt -createdAt");
+
+    if(!video)
+    {
+        throw new ApiError(404, "Video Not Found")
+    }
+    return res
+            .status(200)
+            .json(
+                new ApiResponse(200, video , "Video publish update successfully")
+            )
+
 })
 
 export {

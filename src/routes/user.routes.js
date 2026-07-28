@@ -51,7 +51,7 @@ router.route("/update-cover").post(
     verifyJWT , upload.single("coverImage"), updateUserCoverImage
 )
 
-router.route("/c/:username").get(verifyJWT , getUserChannelProfile)
+router.route("/:username").get(verifyJWT , getUserChannelProfile)
 
 router.route("/history").get(verifyJWT , getWatchHistory)
 export default router;

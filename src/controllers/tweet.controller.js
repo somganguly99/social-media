@@ -38,37 +38,35 @@ const createTweet = asyncHandler(async (req, res) => {
 const getUserTweets = asyncHandler(async (req, res) => {
     // TODO: get user tweets
     const userId = req.user?._id;
-    /*const tweets = await Tweet.aggregate([
-    {
-        $match: {
-            owner: new mongoose.Types.ObjectId(userId)
-        }
-    },
-    {
-        $lookup: {
-            from: "users",
-            localField: "owner",
-            foreignField: "_id",
-            as: "owner",
-            pipeline: [
-                {
-                    $project: {
-                        fullName: 1,
-                        username: 1,
-                        avatar: 1
+    const tweets = await Tweet.aggregate([
+        {
+            $match: {
+                owner: new mongoose.Types.ObjectId(userId)
+            }
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "owner",
+                pipeline: [
+                        {
+                        $project: {
+                            fullName: 1,
+                            username: 1,
+                            avatar: 1
+                        }
                     }
-                }
-            ]
+                ]
+            }
+        },
+        {
+            $addFields: {
+                owner: { $first: "$owner" }
+            }
         }
-    },
-    {
-        $addFields: {
-            owner: { $first: "$owner" }
-        }
-    }
-]);*/
-const tweets = await Tweet.find({ owner: userId })
-    .populate("owner", "fullName username avatar");
+    ]);
 
          if(!tweets || tweets.length ==0)
          {
@@ -104,6 +102,18 @@ const updateTweet = asyncHandler(async (req, res) => {
 
 const deleteTweet = asyncHandler(async (req, res) => {
     //TODO: delete tweet
+    const { tweetId } = req.params
+    const tweet = await Tweet.findById(tweetId)
+    if(!tweet)
+    {
+        throw new ApiError(404, "Tweet Not Found")
+    }
+    await Tweet.deleteOne({ _id: tweetId }); 
+
+     return res
+            .status(200)
+            .json(new ApiResponse(200,  "Tweet Deleted Successfully"))
+
 })
 
 export {
